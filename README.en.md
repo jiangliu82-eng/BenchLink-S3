@@ -1,6 +1,6 @@
 # BenchLink-S3 | Remote MCU debugging and USB passthrough over Wi-Fi
 
-[简体中文](README.md) · **English**
+[简体中文 / Bilingual README](README.md) · **English**
 
 BenchLink-S3 lets developers and AI agents debug microcontrollers and use USB peripherals remotely over SWD, USB/IP and MCP. The **WDA-S3** probe joins the **same LAN as the Windows development PC** over 2.4 GHz Wi-Fi. The PC can use Ethernet or Wi-Fi. Both devices must be able to reach each other.
 
