@@ -93,17 +93,21 @@ arm-none-eabi-gdb app.elf -ex "target extended-remote localhost:3333"
 
 ### USB 透传 / USB passthrough
 
-安装 [usbip-win2 0.9.8.1 x64 驱动与客户端](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.8.1)。驱动安装可能重启 Windows USB Hub。将低功耗全速外设接到 S3 的 USB Host 口；使用实际 IP、枚举出的 busid 和导入端口执行：
+一次配对并安装 usbip-win2 后，后台主机每两秒检查当前 WDA 的 USB 设备。插到 WDA 的外设会自动导入 Windows；设备重启或重新插入后会再次导入。可以关闭浏览器，业务软件照常使用外设驱动和 COM 口。普通透传无需测试配置，默认客户端路径为 `C:/Program Files/USBip/usbip.exe`，自定义路径可在 `usb.executable` 中指定。
 
-Install the [usbip-win2 0.9.8.1 x64 driver and client](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.8.1). Driver installation may restart the Windows USB hub. Connect a low-power, full-speed peripheral to the S3 Host port. Use the actual IP address, listed bus ID and assigned import port.
+After pairing once and installing usbip-win2, the background host checks the active WDA every two seconds and imports its USB peripherals into Windows. Rebooted or reinserted peripherals are imported again. Close the browser and use the usual device drivers and COM ports in your applications. Normal forwarding works without a test configuration. The default client is `C:/Program Files/USBip/usbip.exe`; use `usb.executable` for a custom location.
+
+希望 Windows 登录后自动运行主机，可为当前用户执行一次 `./Start-Wda.ps1 -InstallAtLogon`。使用本机配置时一并传入相同的 `-Config`。
+
+To start the host automatically when this Windows user signs in, register it once with `./Start-Wda.ps1 -InstallAtLogon`. Include the same `-Config` if you use a local configuration.
+
+安装 [usbip-win2 0.9.8.1 x64 驱动与客户端](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.8.1)。驱动安装可能重启 Windows USB Hub。将低功耗全速外设接到 S3 的 USB Host 口；可选：使用实际 IP 检查导出列表和 Windows 导入状态。
+
+Install the [usbip-win2 0.9.8.1 x64 driver and client](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.8.1). Driver installation may restart the Windows USB hub. Connect a low-power, full-speed peripheral to the S3 Host port. Optionally inspect exports and Windows imports using the actual IP address.
 
 ```powershell
 usbip list -r 192.0.2.10
-usbip attach --once -r 192.0.2.10 -b 1-1
 usbip port
-# 使用导入设备；结束时将 1 换成本次导入的端口编号
-# Use the imported device. When finished, replace 1 with its assigned import port.
-usbip detach -p 1
 ```
 
 ### 连续读取与镜像比对 / Verify a continuous flash read against an image
@@ -135,9 +139,21 @@ Codex 的 `[mcp_servers.wda]` 如设置了工具白名单，请使用 `enabled_t
 
 If your Codex `[mcp_servers.wda]` section uses an allowlist, set `enabled_tools = ["wda_debugger", "wda_usb_passthrough"]`. Check the effective configuration with `codex mcp get wda`.
 
-配置目标后，调试工具还可直接执行 `read_cpuid`、`halt` 和 `resume`。例如 `{"action":"halt"}` 会实际暂停目标。USB 工具的 `{"action":"attach"}` 会把配置选定的外设持续导入 Windows，返回端口号，使用完毕以 `{"action":"detach"}` 释放。关闭 MCP 客户端后，已导入设备仍由 Windows 驱动管理。若目标复位会导致串口消失，可用 `{"action":"attach","autoReconnect":true}`。工作台运行期间每 30 秒核对绑定设备并尝试重新挂载配置的 busid、VID/PID。设备重新枚举后，等待目标固件就绪，再按 Windows 实际分配的 COM 号重新打开串口。使用 `detach` 停止自动挂载。
+配置目标后，调试工具还可直接执行 `read_cpuid`、`halt` 和 `resume`。例如 `{"action":"halt"}` 会实际暂停目标。USB 自动挂载在配对后默认启用。维护时可对已配置设备使用 `detach` 释放并暂停本次主机会话的自动挂载，用 `attach` 恢复。
 
-With a target configured, the debugger also accepts `read_cpuid`, `halt` and `resume`. Sending `{"action":"halt"}` halts the physical target. The USB tool accepts `{"action":"attach"}` to import the configured device into Windows and return its port number. Use `{"action":"detach"}` to release it. Windows continues managing the import after the MCP client closes. If a target reset disconnects its serial port, use `{"action":"attach","autoReconnect":true}`. While running, the workbench checks the paired device every 30 seconds and attempts to reattach the configured bus ID and VID/PID. After re-enumeration, wait for the target firmware to be ready and open the COM port Windows actually assigned. Use `detach` to stop automatic attachment.
+With a target configured, the debugger also accepts `read_cpuid`, `halt` and `resume`. Sending `{"action":"halt"}` halts the physical target. Automatic import is enabled by default after pairing. For maintenance, use `detach` on the configured device to release it and pause automatic imports for this host session. Use `attach` to resume.
+
+**可选台架诊断：飞控 MSP UID。** 日常 USB 透传和自动重挂不会打开业务串口或发送 MSP。仅在业务软件已释放串口、需要独立验收时使用此诊断。对使用 MCU UID 作为 USB 序列号的 Betaflight 飞控，可在本机配置的 `usb.mspPython` 填入已安装 pySerial 的 Python 3 解释器绝对路径（例如在专用虚拟环境中执行 `python -m pip install pyserial`）。`usb.vid`、`usb.pid` 和 `usb.busid` 应匹配目标飞控。重启前保存已确认的 12 字节 MCU UID。退出 BF CLI、释放工厂软件的串口句柄后，对同一 MCP 工具调用下面的动作，将示例 UID 换成实机值。
+
+**Optional bench diagnostic for flight controllers.** Normal forwarding and reattachment do not open the application port or send MSP traffic. Use this check only for independent verification after the application releases the port. For Betaflight targets that use the MCU UID as their USB serial number, set `usb.mspPython` in your local configuration to the absolute path of a Python 3 interpreter with pySerial installed (for example, run `python -m pip install pyserial` in a dedicated virtual environment). Match `usb.vid`, `usb.pid` and `usb.busid` to the target. Save its verified 12-byte MCU UID before reboot. After exiting the BF CLI and closing the factory application's serial handle, call the same MCP tool using the actual UID in place of the example.
+
+```json
+{"action":"wait_msp_uid","expectedUid":"00112233445566778899aabb"}
+```
+
+工作台在 45 秒内重试枚举、打开串口和只读 MSP_UID 查询。只有连续两次独立打开同一串口、均收到校验正确且 UID 匹配的应答才返回 `ready: true`、实际端口和耗时。有效应答若返回其他 UID 会立即报错。客户端应留出至少 55 秒请求时间，成功后再使用返回的端口。事件记录可区分枚举等待、打开失败和 MSP 应答失败。该动作验证调用时的通信状态，不进入 CLI。
+
+The workbench retries enumeration, opening the serial port and a read-only MSP_UID request for up to 45 seconds. It returns `ready: true`, the actual port and elapsed time after two consecutive independent opens of the same port each receive a checksum-valid reply with the expected UID. A valid response with a different UID fails immediately. Allow at least 55 seconds for the client request and use the returned port after success. Events distinguish enumeration waits, open failures and MSP response failures. This action verifies current communications without entering the CLI.
 
 先用 `{"action":"probe"}` 核对连接。要运行预设测试，将 `host/config.example.json` 复制为 `host/config.local.json`，填入本机工具绝对路径、目标配置和专用的 4 字节对齐 RAM 地址，以及真实 USB busid、十进制 VID/PID、负载命令和成功输出。示例串口回环要求外设自身 TX/RX 短接，并将脚本路径与 COM7 改为本机实际值。停止旧服务后使用配置启动：
 

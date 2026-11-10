@@ -69,14 +69,15 @@ arm-none-eabi-gdb app.elf -ex "target extended-remote localhost:3333"
 
 ### USB passthrough
 
-Install the [usbip-win2 0.9.8.1 x64 driver and client](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.8.1). Driver installation may restart the Windows USB hub. Connect a low-power, full-speed peripheral to the S3 Host port. Use the actual IP address, listed bus ID and assigned import port.
+After pairing once and installing usbip-win2, the background host checks the active WDA every two seconds and imports its USB peripherals into Windows. Rebooted or reinserted peripherals are imported again. Close the browser and use the usual device drivers and COM ports in your applications. Normal forwarding works without a test configuration. The default client is `C:/Program Files/USBip/usbip.exe`; use `usb.executable` for a custom location.
+
+To start the host automatically when this Windows user signs in, register it once with `./Start-Wda.ps1 -InstallAtLogon`. Include the same `-Config` if you use a local configuration.
+
+Install the [usbip-win2 0.9.8.1 x64 driver and client](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.8.1). Driver installation may restart the Windows USB hub. Connect a low-power, full-speed peripheral to the S3 Host port. Optionally inspect exports and Windows imports using the actual IP address.
 
 ```powershell
 usbip list -r 192.0.2.10
-usbip attach --once -r 192.0.2.10 -b 1-1
 usbip port
-# Use the imported device. When finished, replace 1 with its assigned import port.
-usbip detach -p 1
 ```
 
 ### Verify a continuous flash read against an image
@@ -100,7 +101,15 @@ Connect a Streamable HTTP client to `http://127.0.0.1:7210/mcp`. The release exp
 
 If your Codex `[mcp_servers.wda]` section uses an allowlist, set `enabled_tools = ["wda_debugger", "wda_usb_passthrough"]`. Check the effective configuration with `codex mcp get wda`.
 
-With a target configured, the debugger also accepts `read_cpuid`, `halt` and `resume`. Sending `{"action":"halt"}` halts the physical target. The USB tool accepts `{"action":"attach"}` to import the configured device into Windows and return its port number. Use `{"action":"detach"}` to release it. Windows continues managing the import after the MCP client closes. If a target reset disconnects its serial port, use `{"action":"attach","autoReconnect":true}`. While running, the workbench checks the paired device every 30 seconds and attempts to reattach the configured bus ID and VID/PID. After re-enumeration, wait for the target firmware to be ready and open the COM port Windows actually assigned. Use `detach` to stop automatic attachment.
+With a target configured, the debugger also accepts `read_cpuid`, `halt` and `resume`. Sending `{"action":"halt"}` halts the physical target. Automatic import is enabled by default after pairing. For maintenance, use `detach` on the configured device to release it and pause automatic imports for this host session. Use `attach` to resume.
+
+**Optional bench diagnostic for flight controllers.** Normal forwarding and reattachment do not open the application port or send MSP traffic. Use this check only for independent verification after the application releases the port. For Betaflight targets that use the MCU UID as their USB serial number, set `usb.mspPython` in your local configuration to the absolute path of a Python 3 interpreter with pySerial installed (for example, run `python -m pip install pyserial` in a dedicated virtual environment). Match `usb.vid`, `usb.pid` and `usb.busid` to the target. Save its verified 12-byte MCU UID before reboot. After exiting the BF CLI and closing the factory application's serial handle, call the same MCP tool using the actual UID in place of the example.
+
+```json
+{"action":"wait_msp_uid","expectedUid":"00112233445566778899aabb"}
+```
+
+The workbench retries enumeration, opening the serial port and a read-only MSP_UID request for up to 45 seconds. It returns `ready: true`, the actual port and elapsed time after two consecutive independent opens of the same port each receive a checksum-valid reply with the expected UID. A valid response with a different UID fails immediately. Allow at least 55 seconds for the client request and use the returned port after success. Events distinguish enumeration waits, open failures and MSP response failures. This action verifies current communications without entering the CLI.
 
 Start with `{"action":"probe"}`. To run preset tests, copy `host/config.example.json` to `host/config.local.json`. Set absolute tool paths, the target configuration, a dedicated 4-byte-aligned RAM address, the actual USB bus ID, decimal VID/PID, a workload command and its expected success output. For the example serial loopback, short TX to RX on the peripheral itself. Replace the script path and COM7 with local values. Stop the previous service before starting with this configuration.
 

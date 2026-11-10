@@ -34,6 +34,13 @@ try {
   assert.equal(init.result.serverInfo.name,'BenchLink-S3');
   const list=await rpc('tools/list');
   assert.deepEqual(list.result.tools.map(t=>t.name), ['wda_debugger','wda_usb_passthrough']);
+  assert(list.result.tools[1].inputSchema.properties.action.enum.includes('wait_msp_uid'));
+  for (const args of [{action:'wait_msp_uid'}, {action:'wait_msp_uid',expectedUid:'1234'},
+    {action:'probe',expectedUid:'00112233445566778899aabb'}]) {
+    const reply = await rpc('tools/call', {name:'wda_usb_passthrough',arguments:args});
+    assert.equal(reply.result.isError, true);
+    assert.match(reply.result.content[0].text, /expectedUid/);
+  }
   for (const name of ['wda_debugger','wda_usb_passthrough']) {
     for (const args of [{action:'start'}, {action:'probe'}, {action:'report',id:'../config'}, {action:'shell'}]) {
       const reply=await rpc('tools/call',{name,arguments:args});

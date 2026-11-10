@@ -33,7 +33,8 @@ dialog{width:min(540px,94vw);border:1px solid #3c4a57;border-radius:14px;backgro
 </div>
 <div class="strip"><span id="message">正在读取状态… / Reading status…</span><span id="result">尚无测试结果 / No test results yet</span></div>
 <section class="channels">
-<article class="usb"><h2>USB 转发 / USB forwarding</h2><div class="reading" id="usb-state">待连接 / Waiting for connection</div><pre id="usb">尚未探测 / Awaiting probe</pre></article>
+<article class="usb"><h2>USB 转发 / USB forwarding</h2><div class="reading" id="usb-state">待连接 / Waiting for connection</div><pre id="usb">尚未探测 / Awaiting probe</pre>
+<p id="usb-import-status" role="status"></p></article>
 <article class="dap"><h2>CMSIS-DAP / SWD</h2><div class="reading" id="dap-state">待连接 / Waiting for connection</div><pre id="dap">尚未探测 / Awaiting probe</pre></article>
 </section>
 <div class="timeline"><div class="strip" style="padding-top:0"><span>通道时间线 / Channel timeline</span><span id="duration">等待测试事件 / Waiting for test events</span></div><svg id="chart" viewBox="0 0 1000 115" role="img" aria-label="USB 与 SWD 事件时间线 / USB and SWD event timeline"></svg></div>
@@ -86,6 +87,8 @@ function render(state){
  current=state;el('host').textContent=state.host||'未配置模块地址 / Probe address unset';
  const pair=state.pairing||{devices:[]},busy=Boolean(state.running||state.probing||pair.busy);
  const offline=Boolean(pair.activeId)&&!pair.online;
+ const usb=state.usbReconnect;
+ el('usb-import-status').textContent=!pair.online?'':usb?.error||(!usb?.deviceId?'自动挂载已暂停 / Automatic import paused':usb.imports?.length?'已导入 Windows / Imported into Windows':'等待插入外设 / Waiting for a peripheral');
  el('start').disabled=!state.configured||busy||offline;el('cancel').disabled=!state.running;el('probe').disabled=busy||offline;
  el('add-device').disabled=busy;renderDevices(pair,busy);
  el('device-status').textContent=pair.busy&&!pair.online?'正在连接设备… / Connecting…':pair.error||(!pair.devices.length?'尚无设备，请通过 USB 添加第一台 WDA-S3。 / Connect your first WDA-S3 via USB and choose Add device.':'');

@@ -1,4 +1,4 @@
-import { debugTarget, controlUsb } from './channel-control.mjs';
+import { debugTarget, controlUsb, waitMspUid, syncUsbImports } from './channel-control.mjs';
 import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
@@ -26,8 +26,14 @@ function record(channel, ok, detail) {
 }
 let probing = false;
 let backgroundCheck = null;
-let usbReconnectDevice = null;
+const usbip = config?.usb?.executable ?? path.join(process.env.ProgramFiles ?? 'C:/Program Files', 'USBip', 'usbip.exe');
+let pausedUsbDevice = null;
+let usbImports = [];
+function autoUsbDevice() {
+  return pairing.activeId !== pausedUsbDevice ? pairing.activeId : null;
+}
 let usbReconnectError = null;
+let mspWait = null;
 async function probe(mode) {
   if (backgroundCheck) await backgroundCheck;
   if (closing) throw Error('Service is shutting down');
@@ -59,7 +65,7 @@ function state() {
   status.checking = Boolean(backgroundCheck);
   if (status.checking) status.busy = false;
   return { host: hostname ?? null, configured: Boolean(config), pairing: status, probing, running: runner?.status(), latestResult, events,
-    usbReconnect: { deviceId: usbReconnectDevice, error: usbReconnectError } };
+    usbReconnect: { deviceId: autoUsbDevice(), imports: usbImports, error: usbReconnectError } };
 }
 async function reconnect(id) {
   const host=await pairing.reconnect(id);
@@ -93,15 +99,20 @@ const channels = new Map([['wda_debugger', 'swd'], ['wda_usb_passthrough', 'usb'
 const tools = Array.from(channels, ([name, mode]) => tool(name, mode === 'swd'
   ? 'Read CPUID, halt or resume the target, probe CMSIS-DAP or run the configured OpenOCD SWD test (halts target and writes reserved RAM). 读取 CPUID、暂停或恢复目标、探测 CMSIS-DAP，或运行配置的 OpenOCD SWD 测试（会暂停目标并写入专用 RAM）。'
   : 'Attach/detach the configured USB/IP device, list devices or run the configured attach, workload, re-enumeration and detach test. 挂载或释放配置的 USB/IP 设备、列出设备，或测试挂载、实际负载、重新枚举和释放。', {
-  action: { type: 'string', enum: ['probe', 'start', 'status', 'cancel', 'report', ...(mode === 'usb' ? ['attach', 'detach'] : ['read_cpuid', 'halt', 'resume'])] },
+  action: { type: 'string', enum: ['probe', 'start', 'status', 'cancel', 'report', ...(mode === 'usb' ? ['attach', 'detach', 'wait_msp_uid'] : ['read_cpuid', 'halt', 'resume'])] },
+  ...(mode === 'usb' ? { expectedUid: { type: 'string', pattern: '^[0-9A-Fa-f]{24}$', description: 'wait_msp_uid: verify the known 12-byte Betaflight MCU UID after reboot. 校验重启前已知的 12 字节 MCU UID。' } } : {}),
   ...(mode === 'usb' ? { autoReconnect: { type: 'boolean', description: 'For attach only. Re-import the configured device after re-enumeration while this host service runs. 仅用于 attach，主机服务运行时在设备重新枚举后自动重新挂载。' } } : {}),
   id: { type: 'string', description: 'Run ID required for status, cancel and report. 查询状态、取消或读取报告时需提供本次运行的 ID。' }
 }, ['action']));
 
 async function channelAction(mode, args) {
+  if (args.action === 'wait_msp_uid') {
+    if (mode !== 'usb' || typeof args.expectedUid !== 'string' || !/^[0-9a-f]{24}$/i.test(args.expectedUid))
+      throw Error('wait_msp_uid requires a 24-digit hexadecimal expectedUid');
+  } else if (args.expectedUid !== undefined) throw Error('expectedUid requires wait_msp_uid');
   if (args.autoReconnect !== undefined && (mode !== 'usb' || args.action !== 'attach' || typeof args.autoReconnect !== 'boolean'))
     throw Error('autoReconnect requires USB attach and a boolean value');
-  const direct = mode === 'usb' ? ['attach', 'detach'] : ['read_cpuid', 'halt', 'resume'];
+  const direct = mode === 'usb' ? ['attach', 'detach', 'wait_msp_uid'] : ['read_cpuid', 'halt', 'resume'];
   if (direct.includes(args.action)) {
     if (args.id !== undefined) throw Error('Unexpected run ID');
     if (backgroundCheck) await backgroundCheck;
@@ -109,8 +120,18 @@ async function channelAction(mode, args) {
     if (!config) throw Error('Load a local target configuration first');
     probing = true;
     try {
+      if (args.action === 'wait_msp_uid') {
+        if (!autoUsbDevice())
+          throw Error('Enable USB attach with autoReconnect before waiting');
+        mspWait = new AbortController();
+        const result = await waitMspUid(config.usb, args.expectedUid, mspWait.signal);
+        record('USB', result.ready, result);
+        if (!result.ready) throw Error(JSON.stringify(result));
+        return result;
+      }
       if (mode === 'usb' && (args.action === 'detach' || args.autoReconnect === false)) {
-        usbReconnectDevice = null;
+        pausedUsbDevice = pairing.activeId;
+        usbImports = [];
         usbReconnectError = null;
       }
       if (args.autoReconnect && !pairing.activeId) throw Error('Pair the device before enabling USB auto-reconnect');
@@ -119,13 +140,13 @@ async function channelAction(mode, args) {
       const active = { ...config, host: hostname };
       if (mode === 'swd') return await debugTarget(active, args.action);
       const result = await controlUsb(active, args.action);
-      if (args.autoReconnect) {
-        usbReconnectDevice = pairing.activeId;
+      if (args.action === 'attach' && args.autoReconnect !== false && pairing.activeId) {
+        pausedUsbDevice = null;
         usbReconnectError = null;
         return { ...result, autoReconnect: true };
       }
       return result;
-    } finally { probing = false; }
+    } finally { mspWait = null; probing = false; }
   }
   if (args.action === 'probe' || args.action === 'start') {
     if (args.id !== undefined) throw Error('Unexpected run ID');
@@ -238,17 +259,21 @@ const server = http.createServer(async (req, res) => {
   } catch (error) { json(res, 500, { error: error.message }); }
 }).listen(port, bind, () => console.log('BenchLink-S3 listening', bind, server.address().port));
 
+let nextLeaseCheck = 0;
 function maintainConnection(){
-  if(closing||backgroundCheck||runner?.status()||pairing.busy||probing||!pairing.activeId)return;
-  if (usbReconnectDevice && usbReconnectDevice !== pairing.activeId) {
-    usbReconnectDevice = null;
-    usbReconnectError = null;
-  }
-  backgroundCheck = reconnect().then(async host => {
-    if (!host || closing || !usbReconnectDevice || usbReconnectDevice !== pairing.activeId) return;
+  if(closing||backgroundCheck||runner?.status()||pairing.busy||(probing&&!mspWait)||!pairing.activeId)return;
+  const now = performance.now();
+  const renew = now >= nextLeaseCheck;
+  if (!renew && (!autoUsbDevice() || !pairing.online)) return;
+  if (renew) nextLeaseCheck = now + 30000;
+  // Poll the local USB import independently of the more expensive pairing handshake.
+  backgroundCheck = (renew ? reconnect() : Promise.resolve(hostname)).then(async host => {
+    if (!host || closing || !autoUsbDevice()) return;
     try {
-      await controlUsb({ ...config, host }, 'attach');
-      if (usbReconnectError) record('USB/IP', true, 'USB attachment restored');
+      const imports = await syncUsbImports(host, usbip);
+      if (JSON.stringify(imports) !== JSON.stringify(usbImports) || usbReconnectError)
+        record('USB/IP', true, { stage: 'imports', imports });
+      usbImports = imports;
       usbReconnectError = null;
     } catch (error) {
       if (usbReconnectError !== error.message) record('USB/IP', false, error.message);
@@ -260,13 +285,14 @@ function maintainConnection(){
   }).finally(() => { backgroundCheck=null; });
   return backgroundCheck;
 }
-const heartbeat=setInterval(maintainConnection,30000);
+const heartbeat=setInterval(maintainConnection,2000);
 await maintainConnection();
 
 async function shutdown() {
   if (closing) return;
   closing = true;
   clearInterval(heartbeat);
+  mspWait?.abort();
   runner?.cancel();
   await activePromise;
   await backgroundCheck;
