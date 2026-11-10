@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+    按 VID/PID 获取设备快照或核对新枚举的设备。 / Take a VID/PID snapshot or verify a newly enumerated Windows device.
+#>
 param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{4}$')][string]$Vid,
     [Parameter(Mandatory)][Alias('Pid')][ValidatePattern('^[0-9a-fA-F]{4}$')][string]$ProductId,

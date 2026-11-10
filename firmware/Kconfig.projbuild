@@ -1,19 +1,19 @@
-menu "WDA development board (direct 3.3 V SWD)"
+menu "WDA development board (direct 3.3 V SWD) / WDA 开发板（3.3 V SWD 直连）"
     config WDA_DEVBOARD_RGB
-        bool "WS2812 status pixel on development board GPIO48"
+        bool "WS2812 status pixel on development board GPIO48 / 开发板 GPIO48 上的 WS2812 状态灯"
         default y
         help
-            Disable on the WDA PCB where GPIO48 drives target reset.
+            Disable on the WDA PCB where GPIO48 drives target reset. / 在使用 GPIO48 复位目标的 WDA PCB 上禁用。
     config WDA_SWCLK
-        int "SWCLK GPIO"
+        int "SWCLK GPIO / SWCLK 时钟引脚"
         range 0 48
         default 12
     config WDA_SWDIO
-        int "SWDIO GPIO"
+        int "SWDIO GPIO / SWDIO 数据引脚"
         range 0 48
         default 11
     config WDA_RESET
-        int "Target nRESET GPIO (open drain)"
+        int "Target nRESET GPIO (open drain) / 目标 nRESET 引脚（开漏）"
         range 0 48
         default 13
 endmenu

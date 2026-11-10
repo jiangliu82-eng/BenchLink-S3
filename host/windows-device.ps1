@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+    为工作台枚举串口、交换配网帧或用当前用户的 DPAPI 保护凭据。 / Enumerate ports, exchange setup frames or protect credentials using the current Windows user's DPAPI.
+#>
 param([ValidateSet('ports','exchange','protect','unprotect')][string]$Action)
 $ErrorActionPreference='Stop'
 [Console]::InputEncoding=[Text.UTF8Encoding]::new($false)

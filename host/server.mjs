@@ -34,8 +34,8 @@ async function probe(mode) {
   if (pairing.busy || probing || runner?.status()) throw new Error('The active operation owns the connection');
   probing = true;
   try {
-    if(pairing.activeId && !await reconnect()) throw Error('设备离线，请重新连接');
-    if (!hostname) throw new Error('请先添加设备');
+    if(pairing.activeId && !await reconnect()) throw Error('设备离线，请重新连接 / Device offline. Reconnect.');
+    if (!hostname) throw new Error('请先添加设备 / Add a device first.');
     const channels = mode === 'usb' ? [['USB/IP', listDevices]] :
       mode === 'swd' ? [['CMSIS-DAP', probeDap]] : [['USB/IP', listDevices], ['CMSIS-DAP', probeDap]];
     const results = await Promise.allSettled(channels.map(([, query]) => query(hostname)));
@@ -74,7 +74,7 @@ async function startTest(mode, automated = false) {
   if (!['usb', 'swd', 'concurrent'].includes(mode)) throw new Error('Invalid mode');
   if (runner.status()) throw new Error('A test is already running');
   probing=true;
-  try {if(pairing.activeId && !await reconnect())throw Error('设备离线，请重新连接');}
+  try {if(pairing.activeId && !await reconnect())throw Error('设备离线，请重新连接 / Device offline. Reconnect.');}
   finally {probing=false;}
   if (closing) throw Error('Service is shutting down');
   events.length = 0;
@@ -91,11 +91,11 @@ function tool(name, description, properties = {}, required = []) {
 }
 const channels = new Map([['wda_debugger', 'swd'], ['wda_usb_passthrough', 'usb']]);
 const tools = Array.from(channels, ([name, mode]) => tool(name, mode === 'swd'
-  ? 'Read CPUID, halt or resume the target, probe CMSIS-DAP or run the configured OpenOCD SWD test (halts target and writes reserved RAM).'
-  : 'Attach/detach the configured USB/IP device, list devices or run the configured attach, workload, re-enumeration and detach test.', {
+  ? 'Read CPUID, halt or resume the target, probe CMSIS-DAP or run the configured OpenOCD SWD test (halts target and writes reserved RAM). 读取 CPUID、暂停或恢复目标、探测 CMSIS-DAP，或运行配置的 OpenOCD SWD 测试（会暂停目标并写入专用 RAM）。'
+  : 'Attach/detach the configured USB/IP device, list devices or run the configured attach, workload, re-enumeration and detach test. 挂载或释放配置的 USB/IP 设备、列出设备，或测试挂载、实际负载、重新枚举和释放。', {
   action: { type: 'string', enum: ['probe', 'start', 'status', 'cancel', 'report', ...(mode === 'usb' ? ['attach', 'detach'] : ['read_cpuid', 'halt', 'resume'])] },
-  ...(mode === 'usb' ? { autoReconnect: { type: 'boolean', description: 'For attach only. Re-import the configured device after re-enumeration while this host service runs.' } } : {}),
-  id: { type: 'string', description: 'Run ID required for status, cancel and report.' }
+  ...(mode === 'usb' ? { autoReconnect: { type: 'boolean', description: 'For attach only. Re-import the configured device after re-enumeration while this host service runs. 仅用于 attach，主机服务运行时在设备重新枚举后自动重新挂载。' } } : {}),
+  id: { type: 'string', description: 'Run ID required for status, cancel and report. 查询状态、取消或读取报告时需提供本次运行的 ID。' }
 }, ['action']));
 
 async function channelAction(mode, args) {
@@ -198,8 +198,8 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/status' && req.method === 'GET') return json(res, 200, state());
     if (path.startsWith('/api/pairing/')) {
       // Physical provisioning is local UI only; never available through the LAN Agent.
-      if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))return json(res,403,{error:'请在设备所连接的电脑上打开本地工作台配对'});
-      if(runner?.status()||probing||closing) return json(res,409,{error:'请等待当前测试或探测完成'});
+      if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))return json(res,403,{error:'请在设备所连接的电脑上打开本地工作台配对 / Open the local workbench on the PC connected to the device to pair.'});
+      if(runner?.status()||probing||closing) return json(res,409,{error:'请等待当前测试或探测完成 / Wait for the current test or probe to finish.'});
       if(path==='/api/pairing/ports' && req.method==='GET')return json(res,200,await pairing.ports());
       if(req.method!=='POST')return json(res,405,{error:'Unsupported method'});
       let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>4096)return json(res,413,{error:'Request too large'});}
@@ -256,7 +256,7 @@ function maintainConnection(){
     }
   }).catch(() => {
     pairing.online=false;
-    pairing.error='无法恢复设备绑定，请在本机重新配对';
+    pairing.error='无法恢复设备绑定，请在本机重新配对 / Cannot recover the binding. Pair again on this PC.';
   }).finally(() => { backgroundCheck=null; });
   return backgroundCheck;
 }

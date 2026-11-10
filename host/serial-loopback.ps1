@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+    在指定 COM 口校验串口回环，先短接外设自身 TX/RX。 / Test serial loopback on the specified COM port. Short TX to RX on the peripheral first.
+#>
 param(
     [Parameter(Mandatory)][ValidatePattern('^COM[0-9]+$')][string]$Port,
     [int]$BaudRate=115200,

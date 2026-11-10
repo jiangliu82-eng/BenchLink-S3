@@ -1,4 +1,4 @@
-"""Compare target flash to a raw image over BenchLink CMSIS-DAP/TCP (pyOCD 0.44.1)."""
+"""Compare target flash to a raw image over BenchLink CMSIS-DAP/TCP (pyOCD 0.44.1). 通过 SWD 逐字节比对目标 Flash 和原始镜像。"""
 import argparse
 from collections import deque
 import hashlib
@@ -132,11 +132,11 @@ def verify(args, image, interface):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host", required=True)
-    parser.add_argument("--target", required=True, help="installed pyOCD target name")
-    parser.add_argument("--base", required=True, type=lambda s: int(s, 0))
-    parser.add_argument("--hz", type=int, default=50000)
-    parser.add_argument("image", type=Path)
+    parser.add_argument("--host", required=True, help="probe IP address / 探针 IP 地址")
+    parser.add_argument("--target", required=True, help="installed pyOCD target name / 已安装的 pyOCD 目标型号")
+    parser.add_argument("--base", required=True, help="flash image base address / 镜像在 Flash 中的起始地址", type=lambda s: int(s, 0))
+    parser.add_argument("--hz", help="SWD clock in Hz / SWD 时钟频率（Hz）", type=int, default=50000)
+    parser.add_argument("image", type=Path, help="known-good raw binary / 已验证的原始二进制镜像")
     args = parser.parse_args()
     image = args.image.read_bytes()
     if not image or args.base < 0 or args.base + len(image) > 2**32 or not 0 < args.hz <= 2**32-1:

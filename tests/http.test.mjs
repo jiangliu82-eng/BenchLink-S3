@@ -57,9 +57,9 @@ try {
   const malformed=await fetch(address+'/mcp',{method:'POST',headers,body:'null'});
   assert.equal((await malformed.json()).error.code,-32600);
   const page=await (await fetch(address+'/')).text();
-  assert.match(page, /<title>BenchLink-S3 工作台<\/title>/);
+  assert.match(page, /<title>BenchLink-S3 工作台 \/ Workbench<\/title>/);
   assert.match(page, /WDA-S3 设备列表/);
-  assert.match(page, /双通道并发/);
+  assert.match(page, /双通道并发 \/ Concurrent USB and SWD/);
   const pairDenied=await fetch(address+'/api/pairing/identify',{method:'POST',headers:{...headers,Origin:'http://foreign.invalid'},body:'{"port":"COM8"}'});
   assert.equal(pairDenied.status,403);
   const invalidPair=await fetch(address+'/api/pairing/provision',{method:'POST',headers,body:'{}'});assert.equal(invalidPair.status,400);

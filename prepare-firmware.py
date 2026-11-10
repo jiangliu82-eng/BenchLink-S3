@@ -1,4 +1,4 @@
-"""Prepare the pinned upstream USB/IP application with the WDA DAP component."""
+"""Prepare the pinned upstream USB/IP application with the WDA DAP component. 将 WDA DAP 组件集成到指定版本的上游 USB/IP 应用。"""
 import pathlib
 import shutil
 import sys

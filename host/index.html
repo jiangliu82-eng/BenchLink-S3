@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>BenchLink-S3 工作台</title>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>BenchLink-S3 工作台 / Workbench</title>
 <style>
 :root{color-scheme:dark;--bg:#101419;--panel:#171e25;--line:#2b3641;--muted:#8e9ba8;--cyan:#42d2d5;--amber:#e3b566}
 [hidden]{display:none!important}
@@ -22,31 +22,32 @@ dialog{width:min(540px,94vw);border:1px solid #3c4a57;border-radius:14px;backgro
 .device-list .identity{flex:1;min-width:180px}.device-list small{display:block;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
 .connection-state{font-size:14px;color:var(--muted)}.connection-state::before{content:"●";margin-right:6px}
 .connection-state.online{color:#6bdfa3}.connection-state.pending{color:var(--amber)}
+@media(max-width:600px){.device-heading,.dialog-actions,.strip{flex-wrap:wrap;gap:8px}.toolbar select,details input{max-width:100%}dialog{max-height:90vh;overflow:auto}}
 </style>
-<header><h1><span>BenchLink-S3</span> 工作台 <span id="host"></span></h1><small>Windows · WDA-S3</small></header>
+<header><h1><span>BenchLink-S3</span> 工作台 / Workbench <span id="host"></span></h1><small>Windows · WDA-S3</small></header>
 <main>
-<section aria-labelledby="device-heading"><div class="device-heading"><h2 id="device-heading">WDA-S3 设备列表</h2><button class="primary" id="add-device">＋ 添加设备</button></div><ul class="device-list" id="devices"></ul><p id="device-status" role="status"></p></section>
+<section aria-labelledby="device-heading"><div class="device-heading"><h2 id="device-heading">WDA-S3 设备列表 / WDA-S3 devices</h2><button class="primary" id="add-device">＋ 添加设备 / Add device</button></div><ul class="device-list" id="devices"></ul><p id="device-status" role="status"></p></section>
 <div class="toolbar">
-<select id="mode" aria-label="测试项目"><option value="usb">USB 转发与重新枚举</option><option value="swd">CMSIS-DAP / SWD</option><option value="concurrent">双通道并发</option></select>
-<button class="primary" id="start">开始测试</button><button id="cancel" disabled>停止</button><span class="spacer"></span><button id="probe">探测连接</button>
+<select id="mode" aria-label="测试项目 / Test mode"><option value="usb">USB 转发与重新枚举 / USB forwarding and re-enumeration</option><option value="swd">CMSIS-DAP / SWD</option><option value="concurrent">双通道并发 / Concurrent USB and SWD</option></select>
+<button class="primary" id="start">开始测试 / Start test</button><button id="cancel" disabled>停止 / Stop</button><span class="spacer"></span><button id="probe">探测连接 / Probe connection</button>
 </div>
-<div class="strip"><span id="message">正在读取状态…</span><span id="result">尚无测试结果</span></div>
+<div class="strip"><span id="message">正在读取状态… / Reading status…</span><span id="result">尚无测试结果 / No test results yet</span></div>
 <section class="channels">
-<article class="usb"><h2>USB 转发</h2><div class="reading" id="usb-state">待连接</div><pre id="usb">尚未探测</pre></article>
-<article class="dap"><h2>CMSIS-DAP / SWD</h2><div class="reading" id="dap-state">待连接</div><pre id="dap">尚未探测</pre></article>
+<article class="usb"><h2>USB 转发 / USB forwarding</h2><div class="reading" id="usb-state">待连接 / Waiting for connection</div><pre id="usb">尚未探测 / Awaiting probe</pre></article>
+<article class="dap"><h2>CMSIS-DAP / SWD</h2><div class="reading" id="dap-state">待连接 / Waiting for connection</div><pre id="dap">尚未探测 / Awaiting probe</pre></article>
 </section>
-<div class="timeline"><div class="strip" style="padding-top:0"><span>通道时间线</span><span id="duration">等待测试事件</span></div><svg id="chart" viewBox="0 0 1000 115" role="img" aria-label="USB 与 SWD 事件时间线"></svg></div>
-<div class="strip"><span>事件记录</span><button id="export">导出当前记录</button></div>
-<div class="scroll"><table><thead><tr><th>时间</th><th>通道</th><th>事件</th><th>详情</th></tr></thead><tbody id="events"></tbody></table></div>
-<details><summary class="muted">局域网连接凭据</summary><input id="token" type="password" placeholder="访问令牌" autocomplete="off"><button id="refresh">连接</button></details>
+<div class="timeline"><div class="strip" style="padding-top:0"><span>通道时间线 / Channel timeline</span><span id="duration">等待测试事件 / Waiting for test events</span></div><svg id="chart" viewBox="0 0 1000 115" role="img" aria-label="USB 与 SWD 事件时间线 / USB and SWD event timeline"></svg></div>
+<div class="strip"><span>事件记录 / Event log</span><button id="export">导出当前记录 / Export events</button></div>
+<div class="scroll"><table><thead><tr><th>时间 / Time</th><th>通道 / Channel</th><th>事件 / Event</th><th>详情 / Details</th></tr></thead><tbody id="events"></tbody></table></div>
+<details><summary class="muted">局域网连接凭据 / LAN credentials</summary><input id="token" type="password" placeholder="访问令牌 / Access token" autocomplete="off"><button id="refresh">连接 / Connect</button></details>
 </main>
 <dialog id="pair-dialog" aria-labelledby="pair-title">
-<div class="steps" id="pair-step">01 连接设备 · 02 设置网络 · 03 完成配对</div>
-<h2 id="pair-title">添加 WDA-S3 设备</h2>
-<section id="pair-usb"><p>用数据线连接设备的配置 / 下载 USB 口。保持设备供电，关闭正在占用串口的终端。</p><label for="pair-port">设备串口</label><select id="pair-port"></select><button id="scan-ports" style="margin-top:12px">刷新串口</button></section>
-<section id="pair-network" hidden><p id="pair-identity"></p><label for="pair-name">设备名称</label><input id="pair-name" maxlength="48" value="我的 WDA-S3"><label for="pair-ssid">2.4 GHz Wi-Fi 名称</label><input id="pair-ssid" autocomplete="off" placeholder="与电脑可互通的局域网"><label for="pair-password">Wi-Fi 密码</label><input id="pair-password" type="password" autocomplete="new-password" placeholder="开放网络可留空"><label id="replace-row" hidden><input id="pair-replace" type="checkbox"><span>此设备已有绑定。确认替换为这台电脑，旧绑定将失效。请先停止目标设备的调试和 USB 会话。</span></label></section>
-<div class="pair-status" id="pair-status" role="status" aria-live="polite">请选择设备串口，然后识别设备。</div>
-<div class="dialog-actions"><button id="pair-close">取消</button><button class="primary" id="pair-next">识别设备</button></div>
+<div class="steps" id="pair-step">01 连接设备 · 02 设置网络 · 03 完成配对 / 1 Connect · 2 Set up Wi-Fi · 3 Pair</div>
+<h2 id="pair-title">添加 WDA-S3 设备 / Add a WDA-S3 device</h2>
+<section id="pair-usb"><p>用数据线连接设备的配置 / 下载 USB 口。保持设备供电，关闭正在占用串口的终端。 / Connect a data cable to the maintenance USB port. Keep the probe powered and close any terminal using the serial port.</p><label for="pair-port">设备串口 / Device serial port</label><select id="pair-port"></select><button id="scan-ports" style="margin-top:12px">刷新串口 / Refresh ports</button></section>
+<section id="pair-network" hidden><p id="pair-identity"></p><label for="pair-name">设备名称 / Device name</label><input id="pair-name" maxlength="48" value="WDA-S3"><label for="pair-ssid">2.4 GHz Wi-Fi 名称 / 2.4 GHz Wi-Fi network</label><input id="pair-ssid" autocomplete="off" placeholder="与电脑可互通的局域网 / Same LAN as the PC"><label for="pair-password">Wi-Fi 密码 / Wi-Fi password</label><input id="pair-password" type="password" autocomplete="new-password" placeholder="开放网络可留空 / Leave blank for an open network"><label id="replace-row" hidden><input id="pair-replace" type="checkbox"><span>此设备已有绑定。确认替换为这台电脑，旧绑定将失效。请先停止目标设备的调试和 USB 会话。 / This device is already paired. Replacing its binding pairs it with this PC and invalidates the old key. End debug and USB sessions first.</span></label></section>
+<div class="pair-status" id="pair-status" role="status" aria-live="polite">请选择设备串口，然后识别设备。 / Select the serial port and identify the device.</div>
+<div class="dialog-actions"><button id="pair-close">取消 / Cancel</button><button class="primary" id="pair-next">识别设备 / Identify device</button></div>
 </dialog>
 <script>
 const el=id=>document.getElementById(id);let current={events:[]};let polling=false,deviceOptions='';
@@ -62,7 +63,7 @@ function chart(events){
   add('text',{x:0,y:y+4},label);add('line',{x1:65,y1:y,x2:985,y2:y,stroke:'#33414d'});
   for(const event of timed.filter(e=>e.channel===label))add('circle',{cx:65+event.elapsedMs/max*920,cy:y,r:3,fill:color});
  }
- el('duration').textContent=timed.length?(max/1000).toFixed(1)+' s':'等待测试事件';
+ el('duration').textContent=timed.length?(max/1000).toFixed(1)+' s':'等待测试事件 / Waiting for test events';
 }
 function renderDevices(pair,busy,stale=false){
  const signature=JSON.stringify([pair.devices,pair.activeId,pair.online,busy,stale]);
@@ -75,56 +76,56 @@ function renderDevices(pair,busy,stale=false){
   name.textContent=device.name||device.deviceId;address.textContent=[device.deviceId,device.host].filter(Boolean).join(' · ');
   identity.className='identity';identity.append(name,address);
   const status=document.createElement('span');status.className='connection-state'+(online?' online':device.pending&&!stale?' pending':'');
-  status.textContent=stale?'状态未知':online?'已连接主机':device.pending?'待确认':active?'离线':'未连接';
-  const connect=document.createElement('button');connect.textContent='重新连接';connect.disabled=busy||stale;
+  status.textContent=stale?'状态未知 / Unknown':online?'已连接主机 / Connected to host':device.pending?'待确认 / Pending':active?'离线 / Offline':'未连接 / Disconnected';
+  const connect=document.createElement('button');connect.textContent='重新连接 / Reconnect';connect.disabled=busy||stale;
   connect.onclick=async()=>{connect.disabled=true;try{await request('/api/pairing/reconnect','POST',{deviceId:device.deviceId});await refresh();}catch(e){el('device-status').textContent=e.message;}finally{connect.disabled=busy||stale;}};
   row.append(identity,status,connect);list.append(row);
  }
 }
 function render(state){
- current=state;el('host').textContent=state.host||'未配置模块地址';
+ current=state;el('host').textContent=state.host||'未配置模块地址 / Probe address unset';
  const pair=state.pairing||{devices:[]},busy=Boolean(state.running||state.probing||pair.busy);
  const offline=Boolean(pair.activeId)&&!pair.online;
  el('start').disabled=!state.configured||busy||offline;el('cancel').disabled=!state.running;el('probe').disabled=busy||offline;
  el('add-device').disabled=busy;renderDevices(pair,busy);
- el('device-status').textContent=pair.busy&&!pair.online?'正在连接设备…':pair.error||(!pair.devices.length?'尚无设备，请通过 USB 添加第一台 WDA-S3。':'');
- el('message').textContent=state.running?'测试运行中 · '+state.running.mode:state.configured?'准备就绪':pair.online?'设备已连接；执行测试前需加载目标板测试配置':'请先添加设备；可在到板后设置测试参数';
- el('result').textContent=state.latestResult?(state.latestResult.status==='passed'?'测试通过':'测试未通过')+(state.latestResult.error?' · '+state.latestResult.error:''):'尚无测试结果';
+ el('device-status').textContent=pair.busy&&!pair.online?'正在连接设备… / Connecting…':pair.error||(!pair.devices.length?'尚无设备，请通过 USB 添加第一台 WDA-S3。 / Connect your first WDA-S3 via USB and choose Add device.':'');
+ el('message').textContent=state.running?'测试运行中 / Test running · '+state.running.mode:state.configured?'准备就绪 / Ready':pair.online?'设备已连接；执行测试前需加载目标板测试配置 / Connected. Load the target configuration before testing.':'请先添加设备；可在到板后设置测试参数 / Add a device first. Configure test parameters when the target is connected.';
+ el('result').textContent=state.latestResult?(state.latestResult.status==='passed'?'测试通过 / Test passed':'测试未通过 / Test failed')+(state.latestResult.error?' · '+state.latestResult.error:''):'尚无测试结果 / No test results yet';
  el('events').replaceChildren();
  for(const event of state.events.slice(-160).reverse()){
   const row=document.createElement('tr');
-  for(const value of [event.time.split('T')[1]?.replace('Z','')||event.time,event.channel,event.action||(event.ok?'已响应':'探测失败'),JSON.stringify(event.detail)]){
+  for(const value of [event.time.split('T')[1]?.replace('Z','')||event.time,event.channel,event.action||(event.ok?'已响应 / Responded':'探测失败 / Probe failed'),JSON.stringify(event.detail)]){
    const cell=document.createElement('td');cell.textContent=value;row.append(cell);
   }
   if(event.ok===false)row.className='error';el('events').append(row);
  }
  for(const [names,id] of [[['USB/IP','USB'],'usb'],[['CMSIS-DAP','SWD'],'dap']]){
   const event=state.events.filter(e=>names.includes(e.channel)).at(-1);
-  if(event){el(id+'-state').textContent=event.action||(event.ok?'已响应':'连接失败');el(id).textContent=JSON.stringify(event.detail,null,2).slice(0,360);}
+  if(event){el(id+'-state').textContent=event.action||(event.ok?'已响应 / Responded':'连接失败 / Connection failed');el(id).textContent=JSON.stringify(event.detail,null,2).slice(0,360);}
  }
  chart(state.events);
 }
-async function refresh(){if(polling)return;polling=true;try{render(await request('/api/status'));}catch(error){el('message').textContent=error.message;el('device-status').textContent='无法读取主机状态';if(current.pairing)renderDevices(current.pairing,true,true);}finally{polling=false;}}
+async function refresh(){if(polling)return;polling=true;try{render(await request('/api/status'));}catch(error){el('message').textContent=error.message;el('device-status').textContent='无法读取主机状态 / Cannot read host status';if(current.pairing)renderDevices(current.pairing,true,true);}finally{polling=false;}}
 async function action(url){try{await request(url,'POST');await refresh();}catch(error){el('message').textContent=error.message;}}
 el('probe').onclick=()=>action('/api/probe');el('start').onclick=()=>action('/api/test/'+el('mode').value);el('cancel').onclick=()=>action('/api/test/cancel');el('refresh').onclick=refresh;
 el('export').onclick=()=>{const a=document.createElement('a');const url=URL.createObjectURL(new Blob([JSON.stringify(current,null,2)],{type:'application/json'}));a.href=url;a.download='benchlink-s3-events.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 let pairStage=0,pairIdentity=null,pairBusy=false;
-async function scanPorts(){el('pair-status').textContent='正在读取串口…';try{const ports=await request('/api/pairing/ports');el('pair-port').replaceChildren();for(const port of ports){const o=document.createElement('option');o.value=port;o.textContent=port;el('pair-port').append(o);}el('pair-status').textContent=ports.length?'请选择设备串口，然后识别设备。':'没有发现串口。请连接数据线，确认 USB 转串口驱动已安装后刷新。';el('pair-next').disabled=!ports.length;}catch(e){el('pair-status').textContent=e.message;el('pair-next').disabled=true;}}
-el('add-device').onclick=()=>{pairStage=0;pairIdentity=null;el('pair-usb').hidden=false;el('pair-network').hidden=true;el('pair-next').hidden=false;el('pair-next').textContent='识别设备';el('pair-close').textContent='取消';el('pair-replace').checked=false;el('pair-password').value='';el('pair-dialog').showModal();scanPorts();};
+async function scanPorts(){el('pair-status').textContent='正在读取串口… / Scanning serial ports…';try{const ports=await request('/api/pairing/ports');el('pair-port').replaceChildren();for(const port of ports){const o=document.createElement('option');o.value=port;o.textContent=port;el('pair-port').append(o);}el('pair-status').textContent=ports.length?'请选择设备串口，然后识别设备。 / Select the serial port and identify the device.':'没有发现串口。请连接数据线，确认 USB 转串口驱动已安装后刷新。 / No serial ports found. Connect a data cable, check the USB-to-serial driver, then refresh.';el('pair-next').disabled=!ports.length;}catch(e){el('pair-status').textContent=e.message;el('pair-next').disabled=true;}}
+el('add-device').onclick=()=>{pairStage=0;pairIdentity=null;el('pair-usb').hidden=false;el('pair-network').hidden=true;el('pair-next').hidden=false;el('pair-next').textContent='识别设备 / Identify device';el('pair-close').textContent='取消 / Cancel';el('pair-replace').checked=false;el('pair-password').value='';el('pair-dialog').showModal();scanPorts();};
 el('scan-ports').onclick=scanPorts;
 el('pair-dialog').addEventListener('cancel',e=>{if(pairBusy)e.preventDefault();else el('pair-password').value='';});
 el('pair-close').onclick=()=>{if(!pairBusy){el('pair-password').value='';el('pair-dialog').close();}};
 el('pair-next').onclick=async()=>{
  if(pairBusy)return;pairBusy=true;el('pair-next').disabled=true;el('pair-close').disabled=true;el('scan-ports').disabled=true;
  try{
-  if(pairStage===0){el('pair-status').textContent='正在识别设备…';pairIdentity=await request('/api/pairing/identify','POST',{port:el('pair-port').value});pairIdentity.port=el('pair-port').value;
-   el('pair-identity').textContent='已识别 '+pairIdentity.deviceId;el('pair-usb').hidden=true;el('pair-network').hidden=false;el('replace-row').hidden=!pairIdentity.paired;pairStage=1;el('pair-next').textContent='联网并配对';el('pair-status').textContent='输入 Wi-Fi 信息。密码仅用于设备配网，不保存到电脑。';
-  }else{if(pairIdentity.paired&&!el('pair-replace').checked)throw Error('请勾选确认替换已有绑定');
-   el('pair-status').textContent='正在写入网络设置并确认局域网连接，约需 20–40 秒，请勿拔线…';
+  if(pairStage===0){el('pair-status').textContent='正在识别设备… / Identifying device…';pairIdentity=await request('/api/pairing/identify','POST',{port:el('pair-port').value});pairIdentity.port=el('pair-port').value;
+   el('pair-identity').textContent='已识别 / Identified '+pairIdentity.deviceId;el('pair-usb').hidden=true;el('pair-network').hidden=false;el('replace-row').hidden=!pairIdentity.paired;pairStage=1;el('pair-next').textContent='联网并配对 / Connect and pair';el('pair-status').textContent='输入 Wi-Fi 信息。密码仅用于设备配网，不保存到电脑。 / Enter Wi-Fi credentials. The password is used to configure the device and is never saved on the PC.';
+  }else{if(pairIdentity.paired&&!el('pair-replace').checked)throw Error('请勾选确认替换已有绑定 / Select the checkbox to replace the existing binding.');
+   el('pair-status').textContent='正在写入网络设置并确认局域网连接，约需 20–40 秒，请勿拔线… / Saving network settings and verifying the LAN connection. Keep the cable connected for 20–40 seconds.';
    const job={port:pairIdentity.port,deviceId:pairIdentity.deviceId,name:el('pair-name').value,ssid:el('pair-ssid').value,password:el('pair-password').value,replace:el('pair-replace').checked};
    el('pair-password').value='';const result=await request('/api/pairing/provision','POST',job);job.password='';
-   if(result.online){el('pair-status').textContent='配对完成！可以拔掉配置 USB 数据线，保持设备供电，之后将自动无线重连。';el('pair-network').hidden=true;el('pair-next').hidden=true;el('pair-close').textContent='完成';pairStage=2;}
-   else {el('pair-status').textContent=result.error;el('pair-close').textContent='稍后重新连接';}
+   if(result.online){el('pair-status').textContent='配对完成！可以拔掉配置 USB 数据线，保持设备供电，之后将自动无线重连。 / Paired. Keep the probe powered. You can unplug the maintenance cable and the probe will reconnect over Wi-Fi.';el('pair-network').hidden=true;el('pair-next').hidden=true;el('pair-close').textContent='完成 / Done';pairStage=2;}
+   else {el('pair-status').textContent=result.error;el('pair-close').textContent='稍后重新连接 / Reconnect later';}
   }
  }catch(e){el('pair-status').textContent=e.message;el('pair-password').value='';}
  finally{pairBusy=false;el('pair-next').disabled=false;el('pair-close').disabled=false;el('scan-ports').disabled=false;await refresh();}

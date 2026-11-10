@@ -1,5 +1,7 @@
 # BenchLink-S3｜通过 Wi-Fi 远程调试 MCU 与透传 USB
 
+**简体中文** · [English](README.en.md)
+
 BenchLink-S3 把实验台接入 Wi-Fi，让开发者和 AI Agent 远程调试 MCU、使用 USB 外设。支持 SWD、USB/IP 和 MCP。
 
 硬件型号为 **WDA-S3**。调试器通过 2.4 GHz Wi-Fi 接入**与 Windows 开发机相同的局域网**。开发机可以使用 Wi-Fi 或网线接入，两台设备需能互访。
