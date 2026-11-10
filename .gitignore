@@ -1,0 +1,12 @@
+/.local-token
+/host/config.local.json
+/local.paths.json
+/reports/
+/test-reports/
+/dist/
+/upstream/
+/tests/FakeTool.exe
+__pycache__/
+*.log
+
+/.cache/

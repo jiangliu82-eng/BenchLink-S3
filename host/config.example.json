@@ -1,0 +1,30 @@
+{
+  "host": "192.168.1.50",
+  "powershell": "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+  "usb": {
+    "executable": "C:/Program Files/USBip/usbip.exe",
+    "busid": "1-1",
+    "vid": 4292,
+    "pid": 60000,
+    "workload": {
+      "executable": "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-File",
+        "C:/wda/host/serial-loopback.ps1",
+        "-Port",
+        "COM7",
+        "-Packets",
+        "100"
+      ],
+      "expectedText": "WDA_USB_LOOPBACK_PASS",
+      "timeoutMs": 30000
+    }
+  },
+  "swd": {
+    "executable": "C:/tools/openocd/bin/openocd.exe",
+    "target": "target/stm32f4x.cfg",
+    "scratchAddress": null,
+    "iterations": 120
+  }
+}

@@ -1,0 +1,19 @@
+menu "WDA development board (direct 3.3 V SWD)"
+    config WDA_DEVBOARD_RGB
+        bool "WS2812 status pixel on development board GPIO48"
+        default y
+        help
+            Disable on the WDA PCB where GPIO48 drives target reset.
+    config WDA_SWCLK
+        int "SWCLK GPIO"
+        range 0 48
+        default 12
+    config WDA_SWDIO
+        int "SWDIO GPIO"
+        range 0 48
+        default 11
+    config WDA_RESET
+        int "Target nRESET GPIO (open drain)"
+        range 0 48
+        default 13
+endmenu
