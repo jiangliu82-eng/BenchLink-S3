@@ -73,14 +73,15 @@ static bool valid_packet(const uint8_t *p, size_t n) {
 }
 
 static void serve_client(int fd) {
-    uint8_t request[DAP_PACKET_SIZE], response[DAP_PACKET_SIZE];
+    uint8_t request[DAP_PACKET_SIZE], frame[8 + DAP_PACKET_SIZE];
+    uint8_t *response = frame + 8;
     const struct timeval timeout = { .tv_sec = 60 };
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     DAP_Setup();
     for (;;) {
-        uint8_t hdr[8];
-        if (!exchange_bytes(fd, hdr, sizeof(hdr), false)) break;
+        uint8_t *hdr = frame;
+        if (!exchange_bytes(fd, hdr, 8, false)) break;
         if (!wda_pairing_socket_allowed(fd)) break;
         size_t len = hdr[4] | (hdr[5] << 8);
         if (memcmp(hdr, "DAP", 4) || hdr[6] != 1 || hdr[7] || !len ||
@@ -90,10 +91,10 @@ static void serve_client(int fd) {
         if (valid_packet(request, len)) {
             written = DAP_ProcessCommand(request, response) & 0xffff;
         }
-        if (!written || written > sizeof(response)) break;
+        if (!written || written > DAP_PACKET_SIZE) break;
         hdr[4] = written; hdr[5] = written >> 8; hdr[6] = 2;
-        if (!exchange_bytes(fd, hdr, sizeof(hdr), true) ||
-            !exchange_bytes(fd, response, written, true)) break;
+        // Keep header and payload together to avoid a delayed ACK between them.
+        if (!exchange_bytes(fd, frame, 8 + written, true)) break;
     }
     PORT_OFF();
 }
@@ -121,6 +122,7 @@ static void dap_task(void *unused) {
     }
 }
 void wda_dap_start(void) {
-    if (xTaskCreate(dap_task, "wda-dap", 8192, NULL, 4, NULL) != pdPASS)
+    // The Xtensa cycle counter is per core. Keep the bit clock on one CPU.
+    if (xTaskCreatePinnedToCore(dap_task, "wda-dap", 8192, NULL, 4, NULL, portNUM_PROCESSORS - 1) != pdPASS)
         ESP_LOGE(tag, "Cannot start DAP task");
 }

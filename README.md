@@ -79,6 +79,16 @@ usbip port
 usbip detach -p 1
 ```
 
+### 连续读取与镜像比对
+
+当短读正常、长读出现 `No ACK` 或数据不一致时，使用已知正确的原始二进制作为参照。安装 pyOCD 0.44.1 及目标芯片支持包，在工作台保持配对且 SWD 空闲时运行。将示例地址、型号、镜像起始地址和文件替换为实板配置。
+
+```powershell
+python tests/verify-swd.py --host 192.168.1.50 --target hc32f4a0pitb --base 0x14000 --hz 50000 original-app.bin 2>&1 | Tee-Object swd-readback.log
+```
+
+脚本以 attach 模式连接，检查芯片内存映射，逐块读取与镜像等长的 Flash 并逐字节比较。pyOCD 会执行目标驱动的连接初始化；HC32F4A0 驱动会设置调试控制寄存器。成功时输出实际读回长度和 SHA-256。传输失败时输出所在块和 DAP 响应头，并以非零状态退出。能关联到 TAR 写和连续 DRW 读时，`first_unreturned_address` 给出首个未返回的字地址。内容不符时输出首个不同字节的地址、期望值和实读值。每次重新运行从镜像起点开始。请使用已确认地址范围的 Flash 镜像。
+
 ## MCP
 
 MCP 客户端使用 Streamable HTTP，地址为 `http://127.0.0.1:7210/mcp`。发布版提供两个工具：
@@ -88,7 +98,9 @@ MCP 客户端使用 Streamable HTTP，地址为 `http://127.0.0.1:7210/mcp`。�
 | `wda_debugger` | 查询 CMSIS-DAP 的 SWD 能力 | 通过 OpenOCD 读取 CPUID，暂停目标，写入并恢复专用 RAM，恢复运行并连续采样 |
 | `wda_usb_passthrough` | 列出 USB/IP 设备及 busid、VID/PID | 导入指定设备，验证 Windows 枚举与实际负载，重启根端口后再次导入验证，最后释放 |
 
-配置目标后，调试工具还可直接执行 `read_cpuid`、`halt` 和 `resume`。例如 `{"action":"halt"}` 会实际暂停目标。USB 工具的 `{"action":"attach"}` 会把配置选定的外设持续导入 Windows，返回端口号，使用完毕以 `{"action":"detach"}` 释放。关闭 MCP 客户端后，已导入设备仍由 Windows 驱动管理。
+Codex 的 `[mcp_servers.wda]` 如设置了工具白名单，请使用 `enabled_tools = ["wda_debugger", "wda_usb_passthrough"]`。可通过 `codex mcp get wda` 核对当前配置。
+
+配置目标后，调试工具还可直接执行 `read_cpuid`、`halt` 和 `resume`。例如 `{"action":"halt"}` 会实际暂停目标。USB 工具的 `{"action":"attach"}` 会把配置选定的外设持续导入 Windows，返回端口号，使用完毕以 `{"action":"detach"}` 释放。关闭 MCP 客户端后，已导入设备仍由 Windows 驱动管理。若目标复位会导致串口消失，可用 `{"action":"attach","autoReconnect":true}`。工作台运行期间每 30 秒核对绑定设备并尝试重新挂载配置的 busid、VID/PID。设备重新枚举后，等待目标固件就绪，再按 Windows 实际分配的 COM 号重新打开串口。使用 `detach` 停止自动挂载。
 
 先用 `{"action":"probe"}` 核对连接。要运行预设测试，将 `host/config.example.json` 复制为 `host/config.local.json`，填入本机工具绝对路径、目标配置和专用的 4 字节对齐 RAM 地址，以及真实 USB busid、十进制 VID/PID、负载命令和成功输出。示例串口回环要求外设自身 TX/RX 短接，并将脚本路径与 COM7 改为本机实际值。停止旧服务后使用配置启动：
 

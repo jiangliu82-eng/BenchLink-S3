@@ -26,6 +26,8 @@ function record(channel, ok, detail) {
 }
 let probing = false;
 let backgroundCheck = null;
+let usbReconnectDevice = null;
+let usbReconnectError = null;
 async function probe(mode) {
   if (backgroundCheck) await backgroundCheck;
   if (closing) throw Error('Service is shutting down');
@@ -56,7 +58,8 @@ function state() {
   const status = pairing.status();
   status.checking = Boolean(backgroundCheck);
   if (status.checking) status.busy = false;
-  return { host: hostname ?? null, configured: Boolean(config), pairing: status, probing, running: runner?.status(), latestResult, events };
+  return { host: hostname ?? null, configured: Boolean(config), pairing: status, probing, running: runner?.status(), latestResult, events,
+    usbReconnect: { deviceId: usbReconnectDevice, error: usbReconnectError } };
 }
 async function reconnect(id) {
   const host=await pairing.reconnect(id);
@@ -91,10 +94,13 @@ const tools = Array.from(channels, ([name, mode]) => tool(name, mode === 'swd'
   ? 'Read CPUID, halt or resume the target, probe CMSIS-DAP or run the configured OpenOCD SWD test (halts target and writes reserved RAM).'
   : 'Attach/detach the configured USB/IP device, list devices or run the configured attach, workload, re-enumeration and detach test.', {
   action: { type: 'string', enum: ['probe', 'start', 'status', 'cancel', 'report', ...(mode === 'usb' ? ['attach', 'detach'] : ['read_cpuid', 'halt', 'resume'])] },
+  ...(mode === 'usb' ? { autoReconnect: { type: 'boolean', description: 'For attach only. Re-import the configured device after re-enumeration while this host service runs.' } } : {}),
   id: { type: 'string', description: 'Run ID required for status, cancel and report.' }
 }, ['action']));
 
 async function channelAction(mode, args) {
+  if (args.autoReconnect !== undefined && (mode !== 'usb' || args.action !== 'attach' || typeof args.autoReconnect !== 'boolean'))
+    throw Error('autoReconnect requires USB attach and a boolean value');
   const direct = mode === 'usb' ? ['attach', 'detach'] : ['read_cpuid', 'halt', 'resume'];
   if (direct.includes(args.action)) {
     if (args.id !== undefined) throw Error('Unexpected run ID');
@@ -103,10 +109,22 @@ async function channelAction(mode, args) {
     if (!config) throw Error('Load a local target configuration first');
     probing = true;
     try {
+      if (mode === 'usb' && (args.action === 'detach' || args.autoReconnect === false)) {
+        usbReconnectDevice = null;
+        usbReconnectError = null;
+      }
+      if (args.autoReconnect && !pairing.activeId) throw Error('Pair the device before enabling USB auto-reconnect');
       if (pairing.activeId && !await reconnect()) throw Error('Device offline');
       if (!hostname) throw Error('Configure or pair a device first');
       const active = { ...config, host: hostname };
-      return mode === 'usb' ? await controlUsb(active, args.action) : await debugTarget(active, args.action);
+      if (mode === 'swd') return await debugTarget(active, args.action);
+      const result = await controlUsb(active, args.action);
+      if (args.autoReconnect) {
+        usbReconnectDevice = pairing.activeId;
+        usbReconnectError = null;
+        return { ...result, autoReconnect: true };
+      }
+      return result;
     } finally { probing = false; }
   }
   if (args.action === 'probe' || args.action === 'start') {
@@ -136,7 +154,7 @@ async function rpc(message) {
   switch (message.method) {
   case 'initialize':
     return { ...reply, result: { protocolVersion: '2025-03-26', capabilities: { tools: {} },
-      serverInfo: { name: 'BenchLink-S3', version: '0.1.0' } } };
+      serverInfo: { name: 'BenchLink-S3', version: '0.1.1' } } };
   case 'ping': return { ...reply, result: {} };
   case 'tools/list': return { ...reply, result: { tools } };
   case 'tools/call':
@@ -221,8 +239,22 @@ const server = http.createServer(async (req, res) => {
 }).listen(port, bind, () => console.log('BenchLink-S3 listening', bind, server.address().port));
 
 function maintainConnection(){
-  if(closing||runner?.status()||pairing.busy||probing||!pairing.activeId)return;
-  backgroundCheck = reconnect().catch(() => {
+  if(closing||backgroundCheck||runner?.status()||pairing.busy||probing||!pairing.activeId)return;
+  if (usbReconnectDevice && usbReconnectDevice !== pairing.activeId) {
+    usbReconnectDevice = null;
+    usbReconnectError = null;
+  }
+  backgroundCheck = reconnect().then(async host => {
+    if (!host || closing || !usbReconnectDevice || usbReconnectDevice !== pairing.activeId) return;
+    try {
+      await controlUsb({ ...config, host }, 'attach');
+      if (usbReconnectError) record('USB/IP', true, 'USB attachment restored');
+      usbReconnectError = null;
+    } catch (error) {
+      if (usbReconnectError !== error.message) record('USB/IP', false, error.message);
+      usbReconnectError = error.message;
+    }
+  }).catch(() => {
     pairing.online=false;
     pairing.error='无法恢复设备绑定，请在本机重新配对';
   }).finally(() => { backgroundCheck=null; });
@@ -237,6 +269,7 @@ async function shutdown() {
   clearInterval(heartbeat);
   runner?.cancel();
   await activePromise;
+  await backgroundCheck;
   server.close();
   server.closeAllConnections();
 }

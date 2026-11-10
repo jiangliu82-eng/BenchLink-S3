@@ -30,8 +30,9 @@ text = header.read_text(encoding="utf-8")
 start = text.index("#if defined(__CC_ARM)")
 end = text.index("// Fixed delay", start)
 text = text[:start] + """__STATIC_FORCEINLINE void PIN_DELAY_SLOW(uint32_t delay) {
-  // Xtensa portable delay; requested SWD rate is an upper bound.
-  for (volatile uint32_t count = delay; count; --count) __NOP();
+  // DAP requests the number of CPU cycles to wait. Unsigned subtraction handles wrap.
+  uint32_t start = esp_cpu_get_cycle_count();
+  while ((uint32_t)(esp_cpu_get_cycle_count() - start) < delay) { __NOP(); }
 }
 
 """ + text[end:]

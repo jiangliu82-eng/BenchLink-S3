@@ -5,9 +5,11 @@
 #include "sdkconfig.h"
 #include "driver/gpio.h"
 #include "esp_cpu.h"
+#include "hal/gpio_ll.h"
 
 #define CPU_CLOCK (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ * 1000000UL)
 #define IO_PORT_WRITE_CYCLES 2U
+#define DELAY_SLOW_CYCLES 1U
 #define DAP_SWD 1
 #define DAP_JTAG 0
 #define DAP_DEFAULT_PORT 1U
@@ -44,6 +46,9 @@ static inline void DAP_SETUP(void) {
     gpio_reset_pin(WDA_DIO);
     gpio_reset_pin(WDA_CLK);
     gpio_reset_pin(WDA_RST);
+    // Limit edge drive on direct 3.3 V SWD wiring.
+    gpio_set_drive_capability(WDA_CLK, GPIO_DRIVE_CAP_0);
+    gpio_set_drive_capability(WDA_DIO, GPIO_DRIVE_CAP_0);
     gpio_set_level(WDA_RST, 1);
     gpio_set_direction(WDA_RST, GPIO_MODE_INPUT_OUTPUT_OD);
     PORT_OFF();
@@ -54,16 +59,18 @@ static inline void PORT_SWD_SETUP(void) {
     gpio_set_direction(WDA_DIO, GPIO_MODE_INPUT_OUTPUT);
     gpio_set_direction(WDA_CLK, GPIO_MODE_INPUT_OUTPUT);
 }
-#define PIN_SWCLK_TCK_IN() gpio_get_level(WDA_CLK)
-#define PIN_SWCLK_TCK_SET() gpio_set_level(WDA_CLK, 1)
-#define PIN_SWCLK_TCK_CLR() gpio_set_level(WDA_CLK, 0)
-#define PIN_SWDIO_TMS_IN() gpio_get_level(WDA_DIO)
-#define PIN_SWDIO_TMS_SET() gpio_set_level(WDA_DIO, 1)
-#define PIN_SWDIO_TMS_CLR() gpio_set_level(WDA_DIO, 0)
-#define PIN_SWDIO_IN() gpio_get_level(WDA_DIO)
-#define PIN_SWDIO_OUT(bit) gpio_set_level(WDA_DIO, (bit) & 1U)
-#define PIN_SWDIO_OUT_ENABLE() gpio_set_direction(WDA_DIO, GPIO_MODE_INPUT_OUTPUT)
-#define PIN_SWDIO_OUT_DISABLE() gpio_set_direction(WDA_DIO, GPIO_MODE_INPUT)
+/* Keep the input path enabled. Only the output-enable bit changes during
+ * turnaround; the GPIO matrix is configured once in PORT_SWD_SETUP. */
+#define PIN_SWCLK_TCK_IN() gpio_ll_get_level(&GPIO, WDA_CLK)
+#define PIN_SWCLK_TCK_SET() gpio_ll_set_level(&GPIO, WDA_CLK, 1)
+#define PIN_SWCLK_TCK_CLR() gpio_ll_set_level(&GPIO, WDA_CLK, 0)
+#define PIN_SWDIO_TMS_IN() gpio_ll_get_level(&GPIO, WDA_DIO)
+#define PIN_SWDIO_TMS_SET() gpio_ll_set_level(&GPIO, WDA_DIO, 1)
+#define PIN_SWDIO_TMS_CLR() gpio_ll_set_level(&GPIO, WDA_DIO, 0)
+#define PIN_SWDIO_IN() PIN_SWDIO_TMS_IN()
+#define PIN_SWDIO_OUT(bit) gpio_ll_set_level(&GPIO, WDA_DIO, (bit) & 1U)
+#define PIN_SWDIO_OUT_ENABLE() gpio_ll_output_enable(&GPIO, WDA_DIO)
+#define PIN_SWDIO_OUT_DISABLE() gpio_ll_output_disable(&GPIO, WDA_DIO)
 #define PIN_nRESET_IN() gpio_get_level(WDA_RST)
 #define PIN_nRESET_OUT(bit) gpio_set_level(WDA_RST, (bit) & 1U)
 #define RESET_TARGET() 0U

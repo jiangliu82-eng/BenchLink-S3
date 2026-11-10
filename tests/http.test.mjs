@@ -44,6 +44,11 @@ try {
   await fs.mkdir(env.WDA_REPORTS,{recursive:true});
   await fs.writeFile(path.join(env.WDA_REPORTS, runId+'.json'),JSON.stringify({id:runId,mode:'usb',status:'passed'}));
   const getReport=name=>rpc('tools/call',{name,arguments:{action:'report',id:runId}});
+  for (const args of [{action:'report',id:runId,autoReconnect:true}, {action:'attach',autoReconnect:'yes'}]) {
+    const reply = await rpc('tools/call', {name:'wda_usb_passthrough',arguments:args});
+    assert.equal(reply.result.isError, true);
+    assert.match(reply.result.content[0].text, /autoReconnect/);
+  }
   assert.equal(JSON.parse((await getReport('wda_usb_passthrough')).result.content[0].text).status,'passed');
   assert.equal((await getReport('wda_debugger')).result.isError,true);
   assert.equal((await rpc('tools/call',{name:'wda_script_start',arguments:{}})).result.isError,true);
