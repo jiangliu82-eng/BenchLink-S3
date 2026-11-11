@@ -71,6 +71,8 @@ arm-none-eabi-gdb app.elf -ex "target extended-remote localhost:3333"
 
 After pairing once and installing usbip-win2, the background host checks the active WDA every two seconds and imports its USB peripherals into Windows. Rebooted or reinserted peripherals are imported again. Close the browser and use the usual device drivers and COM ports in your applications. Normal forwarding works without a test configuration. The default client is `C:/Program Files/USBip/usbip.exe`; use `usb.executable` for a custom location.
 
+The WDA firmware samples the native USB root port every five seconds. Two consecutive samples showing a physical connection with no configured device trigger a root-port restart to retry enumeration. Empty ports and enumerated devices are left alone.
+
 To start the host automatically when this Windows user signs in, register it once with `./Start-Wda.ps1 -InstallAtLogon`. Include the same `-Config` if you use a local configuration.
 
 Install the [usbip-win2 0.9.8.1 x64 driver and client](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.8.1). Driver installation may restart the Windows USB hub. Connect a low-power, full-speed peripheral to the S3 Host port. Optionally inspect exports and Windows imports using the actual IP address.

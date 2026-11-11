@@ -175,7 +175,7 @@ async function rpc(message) {
   switch (message.method) {
   case 'initialize':
     return { ...reply, result: { protocolVersion: '2025-03-26', capabilities: { tools: {} },
-      serverInfo: { name: 'BenchLink-S3', version: '0.1.1' } } };
+      serverInfo: { name: 'BenchLink-S3', version: '0.1.2' } } };
   case 'ping': return { ...reply, result: {} };
   case 'tools/list': return { ...reply, result: { tools } };
   case 'tools/call':
